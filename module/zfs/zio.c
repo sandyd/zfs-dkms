@@ -1179,6 +1179,18 @@ __zio_execute(zio_t *zio)
 			return;
 		}
 
+		/*
+		 * If we are performing a scanning operation we may have
+		 * limited stack space due to the recursive nature of
+		 * dsl_scan_visitbp().  To prevent stack overflow dispatch
+		 * the zio processing to the ZIO_TASKQ_ISSUE taskq.
+		 */
+		if ((zio->io_flags & ZIO_FLAG_SCAN_THREAD) &&
+		    (zio_taskq_member(zio, ZIO_TASKQ_ISSUE) == 0)) {
+			zio_taskq_dispatch(zio, ZIO_TASKQ_ISSUE, B_FALSE);
+			return;
+		}
+
 		zio->io_stage = stage;
 		rv = zio_pipeline[highbit(stage) - 1](zio);
 
